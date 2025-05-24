@@ -1,0 +1,26 @@
+{
+    "description": "中兴设备基本配置查询",
+    "commands": [
+        {
+            "command": "show version",
+            "delay": 2,
+            "description": "显示版本"
+        },
+        {
+            "command": "show running-config",
+            "delay": 3,
+            "description": "显示运行配置"
+        },
+        {
+            "command": "show interface status",
+            "delay": 2,
+            "description": "显示接口状态"
+        },
+        {
+            "command": "show ip route",
+            "delay": 2,
+            "description": "显示路由表"
+        }
+    ],
+    "vendor": "ZTE"
+}

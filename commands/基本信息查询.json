@@ -1,0 +1,21 @@
+{
+    "description": "查询设备基本信息",
+    "commands": [
+        {
+            "command": "display version",
+            "delay": 2,
+            "description": "显示版本信息"
+        },
+        {
+            "command": "display device",
+            "delay": 2,
+            "description": "显示设备信息"
+        },
+        {
+            "command": "display interface brief",
+            "delay": 2,
+            "description": "显示接口简要信息"
+        }
+    ],
+    "vendor": "通用"
+}
