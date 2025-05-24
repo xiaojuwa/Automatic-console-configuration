@@ -43,8 +43,8 @@
 
 1. **克隆或下载项目**
    ```bash
-   git clone <repository-url>
-   cd network-device-assistant
+   git clone https://github.com/xiaojuwa/Automatic-console-configuration.git
+   cd Automatic-console-configuration
    ```
 
 2. **安装依赖包**
