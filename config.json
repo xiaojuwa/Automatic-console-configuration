@@ -1,0 +1,83 @@
+{
+    "baudrates": [
+        9600,
+        19200,
+        38400,
+        57600,
+        115200
+    ],
+    "timeout": 3,
+    "device_patterns": {
+        "ZTE": [
+            "ZTE",
+            "ZXR",
+            "ZXUN"
+        ],
+        "Huawei": [
+            "Huawei",
+            "VRP",
+            "HUAWEI"
+        ],
+        "H3C": [
+            "H3C",
+            "Comware",
+            "HP"
+        ]
+    },
+    "common_prompts": [
+        ">",
+        "#",
+        "]",
+        "$",
+        "%"
+    ],
+    "identification_commands": [
+        "display version",
+        "show version",
+        "show system",
+        "display device"
+    ],
+    "log_directory": "logs",
+    "commands_directory": "commands",
+    "auto_login": {
+        "enabled": false,
+        "username": "test_user",
+        "password": "test_pass",
+        "enable_password": "test_enable",
+        "timeout": 30,
+        "prompts": {
+            "username": [
+                "Username:",
+                "login:",
+                "User:",
+                "用户名:"
+            ],
+            "password": [
+                "Password:",
+                "password:",
+                "密码:"
+            ],
+            "enable": [
+                ">"
+            ],
+            "enable_password": [
+                "Password:",
+                "password:",
+                "密码:"
+            ],
+            "success": [
+                "#",
+                "]"
+            ],
+            "more": [
+                "More",
+                "--More--",
+                "---- More ----",
+                "Press any key to continue"
+            ]
+        },
+        "responses": {
+            "more": " "
+        }
+    }
+}

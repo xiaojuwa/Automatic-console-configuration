@@ -1,0 +1,88 @@
+=== 会话开始 2025-05-25 20:10:57 ===
+
+[20:11:47] 发送命令: dis cu
+
+User interface aux0 is available.
+
+
+
+Press ENTER to get started.
+
+Login authentication
+
+
+Username:dis cu
+Password:
+% Login failed!
+
+Username:[20:12:07] 发送命令: admin
+admin
+Password:
+% Login failed!
+
+Username:[20:12:15] 发送命令: huawei
+huawei
+Password:
+% Login failed!
+[2J
+********************************************************************************
+*  Copyright(c) 2004-2010 Hangzhou H3C Tech. Co., Ltd. All rights reserved.    *
+*  Without the owner's prior written consent,                                  *
+*  no decompiling or reverse-engineering shall be allowed.                     *
+********************************************************************************
+
+User interface aux0 is available.
+
+
+
+Please press ENTER.
+开始执行命令序列: 华三基本配置
+描述: 华三设备基本配置查询
+总共 4 个命令
+--------------------------------------------------
+
+[1/4] 执行命令: display version
+描述: 显示版本
+
+
+Login authentication
+
+
+Username:
+[2/4] 执行命令: display current-configuration
+描述: 显示当前配置
+display current-configuration
+Password:
+% Login failed!
+
+[3/4] 执行命令: display interface brief
+描述: 显示接口状态
+
+Username:display interface brief
+Password:
+% Login failed!
+
+[4/4] 执行命令: display ip routing-table
+描述: 显示路由表
+
+命令序列执行完成: 华三基本配置
+==================================================
+
+Username:display ip routing-table
+Password:
+% Login failed!
+[2J
+********************************************************************************
+*  Copyright(c) 2004-2010 Hangzhou H3C Tech. Co., Ltd. All rights reserved.    *
+*  Without the owner's prior written consent,                                  *
+*  no decompiling or reverse-engineering shall be allowed.                     *
+********************************************************************************
+
+User interface aux0 is available.
+
+
+
+Please press ENTER.
+[20:13:01] 发送命令: ENTER
+
+=== 会话结束 2025-05-25 20:13:51 ===

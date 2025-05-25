@@ -7,7 +7,7 @@ from typing import Dict, List, Any
 
 class Config:
     """配置管理类"""
-    
+
     def __init__(self, config_file: str = "config.json"):
         self.config_file = config_file
         self.default_config = {
@@ -21,15 +21,33 @@ class Config:
             "common_prompts": [">", "#", "]", "$", "%"],
             "identification_commands": [
                 "display version",
-                "show version", 
+                "show version",
                 "show system",
                 "display device"
             ],
             "log_directory": "logs",
-            "commands_directory": "commands"
+            "commands_directory": "commands",
+            "auto_login": {
+                "enabled": False,
+                "username": "",
+                "password": "",
+                "enable_password": "",
+                "timeout": 30,
+                "prompts": {
+                    "username": ["Username:", "login:", "User:", "用户名:"],
+                    "password": ["Password:", "password:", "密码:"],
+                    "enable": [">"],
+                    "enable_password": ["Password:", "password:", "密码:"],
+                    "success": ["#", "]"],
+                    "more": ["More", "--More--", "---- More ----", "Press any key to continue"]
+                },
+                "responses": {
+                    "more": " "
+                }
+            }
         }
         self.config = self.load_config()
-    
+
     def load_config(self) -> Dict[str, Any]:
         """加载配置文件"""
         if os.path.exists(self.config_file):
@@ -45,7 +63,7 @@ class Config:
                 return self.default_config.copy()
         else:
             return self.default_config.copy()
-    
+
     def save_config(self) -> bool:
         """保存配置文件"""
         try:
@@ -55,15 +73,15 @@ class Config:
         except Exception as e:
             print(f"保存配置文件失败: {e}")
             return False
-    
+
     def get(self, key: str, default=None):
         """获取配置项"""
         return self.config.get(key, default)
-    
+
     def set(self, key: str, value: Any):
         """设置配置项"""
         self.config[key] = value
-    
+
     def ensure_directories(self):
         """确保必要的目录存在"""
         for dir_key in ["log_directory", "commands_directory"]:

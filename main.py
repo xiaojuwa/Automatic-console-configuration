@@ -13,13 +13,14 @@ from config import Config
 from serial_manager import SerialManager
 from device_detector import DeviceDetector
 from command_manager import CommandManager
+from auto_login_manager import AutoLoginManager
 
 class NetworkDeviceAssistant:
     """网络设备自动化助手主类"""
 
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("网络设备自动化助手 v1.0")
+        self.root.title("网络设备自动化助手 v1.1")
         self.root.geometry("1200x800")
 
         # 初始化配置和管理器
@@ -29,12 +30,19 @@ class NetworkDeviceAssistant:
         self.serial_manager = SerialManager(self.config)
         self.device_detector = DeviceDetector(self.config, self.serial_manager)
         self.command_manager = CommandManager(self.config, self.serial_manager)
+        self.auto_login_manager = AutoLoginManager(self.config, self.serial_manager)
 
         # 创建默认命令序列
         self.command_manager.create_default_sequences()
 
         # 设置串口数据回调
         self.serial_manager.set_data_callback(self.on_serial_data_received)
+
+        # 设置自动登录回调
+        self.auto_login_manager.set_callbacks(
+            status_callback=self.update_login_status,
+            output_callback=self.append_output
+        )
 
         # 初始化变量
         self.current_log_file = None
@@ -103,11 +111,14 @@ class NetworkDeviceAssistant:
 
         ttk.Button(button_frame, text="设备识别", command=self.detect_device).pack(side=tk.RIGHT, padx=(5, 0))
 
+        # 自动登录配置区域
+        self.create_auto_login_panel(control_frame)
+
         # 设备信息区域
         device_frame = ttk.LabelFrame(control_frame, text="设备信息", padding=10)
         device_frame.pack(fill=tk.X, pady=(0, 10))
 
-        self.device_info_text = tk.Text(device_frame, height=6, state=tk.DISABLED)
+        self.device_info_text = tk.Text(device_frame, height=4, state=tk.DISABLED)
         self.device_info_text.pack(fill=tk.BOTH, expand=True)
 
         # 命令序列区域
@@ -152,19 +163,86 @@ class NetworkDeviceAssistant:
         ttk.Button(log_frame, text="保存日志", command=self.save_log).pack(side=tk.LEFT, fill=tk.X, expand=True)
         ttk.Button(log_frame, text="清空输出", command=self.clear_output).pack(side=tk.RIGHT, padx=(5, 0))
 
+    def create_auto_login_panel(self, parent):
+        """创建自动登录配置面板"""
+        login_frame = ttk.LabelFrame(parent, text="自动登录", padding=10)
+        login_frame.pack(fill=tk.X, pady=(0, 10))
+
+        # 启用自动登录复选框
+        self.auto_login_enabled_var = tk.BooleanVar()
+        auto_login_config = self.config.get("auto_login", {})
+        self.auto_login_enabled_var.set(auto_login_config.get("enabled", False))
+
+        enable_frame = ttk.Frame(login_frame)
+        enable_frame.pack(fill=tk.X, pady=(0, 5))
+
+        ttk.Checkbutton(
+            enable_frame,
+            text="启用自动登录",
+            variable=self.auto_login_enabled_var,
+            command=self.on_auto_login_toggle
+        ).pack(side=tk.LEFT)
+
+        # 登录状态标签
+        self.login_status_label = ttk.Label(enable_frame, text="未登录", foreground="gray")
+        self.login_status_label.pack(side=tk.RIGHT)
+
+        # 用户名
+        user_frame = ttk.Frame(login_frame)
+        user_frame.pack(fill=tk.X, pady=(0, 5))
+
+        ttk.Label(user_frame, text="用户名:", width=8).pack(side=tk.LEFT)
+        self.username_var = tk.StringVar(value=auto_login_config.get("username", ""))
+        username_entry = ttk.Entry(user_frame, textvariable=self.username_var, width=15)
+        username_entry.pack(side=tk.LEFT, padx=(5, 0))
+
+        # 密码
+        pass_frame = ttk.Frame(login_frame)
+        pass_frame.pack(fill=tk.X, pady=(0, 5))
+
+        ttk.Label(pass_frame, text="密码:", width=8).pack(side=tk.LEFT)
+        self.password_var = tk.StringVar(value=auto_login_config.get("password", ""))
+        password_entry = ttk.Entry(pass_frame, textvariable=self.password_var, show="*", width=15)
+        password_entry.pack(side=tk.LEFT, padx=(5, 0))
+
+        # Enable密码
+        enable_pass_frame = ttk.Frame(login_frame)
+        enable_pass_frame.pack(fill=tk.X, pady=(0, 5))
+
+        ttk.Label(enable_pass_frame, text="Enable:", width=8).pack(side=tk.LEFT)
+        self.enable_password_var = tk.StringVar(value=auto_login_config.get("enable_password", ""))
+        enable_password_entry = ttk.Entry(enable_pass_frame, textvariable=self.enable_password_var, show="*", width=15)
+        enable_password_entry.pack(side=tk.LEFT, padx=(5, 0))
+
+        # 保存和测试按钮
+        btn_frame = ttk.Frame(login_frame)
+        btn_frame.pack(fill=tk.X, pady=(5, 0))
+
+        ttk.Button(btn_frame, text="保存配置", command=self.save_login_config, width=10).pack(side=tk.LEFT)
+        ttk.Button(btn_frame, text="测试登录", command=self.test_auto_login, width=10).pack(side=tk.LEFT, padx=(5, 0))
+
     def create_output_panel(self, parent):
         """创建右侧输出面板"""
-        output_frame = ttk.LabelFrame(parent, text="输出日志", padding=10)
+        output_frame = ttk.LabelFrame(parent, text="实时终端", padding=10)
         output_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
         # 创建带滚动条的文本框
         self.output_text = scrolledtext.ScrolledText(
             output_frame,
-            wrap=tk.WORD,
-            font=('Consolas', 10),
-            state=tk.DISABLED
+            wrap=tk.CHAR,  # 改为字符换行，更像终端
+            font=('Consolas', 9),
+            state=tk.DISABLED,
+            bg='black',     # 黑色背景
+            fg='green',     # 绿色文字
+            insertbackground='green'  # 绿色光标
         )
         self.output_text.pack(fill=tk.BOTH, expand=True)
+
+        # 配置文本标签样式
+        self.output_text.tag_configure("timestamp", foreground="cyan")
+        self.output_text.tag_configure("command", foreground="yellow")
+        self.output_text.tag_configure("error", foreground="red")
+        self.output_text.tag_configure("success", foreground="lightgreen")
 
         # 输出控制
         output_control_frame = ttk.Frame(output_frame)
@@ -173,16 +251,27 @@ class NetworkDeviceAssistant:
         self.auto_scroll_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(output_control_frame, text="自动滚动", variable=self.auto_scroll_var).pack(side=tk.LEFT)
 
+        # 实时模式开关
+        self.live_mode_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(output_control_frame, text="实时模式", variable=self.live_mode_var).pack(side=tk.LEFT, padx=(10, 0))
+
         # 手动命令输入
         manual_frame = ttk.Frame(output_control_frame)
         manual_frame.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(10, 0))
 
+        ttk.Label(manual_frame, text="命令:").pack(side=tk.LEFT)
         self.manual_cmd_var = tk.StringVar()
-        manual_entry = ttk.Entry(manual_frame, textvariable=self.manual_cmd_var)
-        manual_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        manual_entry = ttk.Entry(manual_frame, textvariable=self.manual_cmd_var, font=('Consolas', 9))
+        manual_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
         manual_entry.bind('<Return>', self.send_manual_command)
+        manual_entry.bind('<Up>', self.command_history_up)
+        manual_entry.bind('<Down>', self.command_history_down)
 
         ttk.Button(manual_frame, text="发送", command=self.send_manual_command).pack(side=tk.RIGHT, padx=(5, 0))
+
+        # 命令历史
+        self.command_history = []
+        self.history_index = -1
 
     def create_status_bar(self):
         """创建状态栏"""
@@ -280,6 +369,10 @@ class NetworkDeviceAssistant:
 
             # 开始日志记录
             self.start_logging()
+
+            # 如果启用了自动登录，开始登录过程
+            if self.auto_login_enabled_var.get():
+                self.start_auto_login()
         else:
             messagebox.showerror("错误", "连接失败，请检查端口和波特率")
             self.update_status("连接失败")
@@ -429,12 +522,47 @@ class NetworkDeviceAssistant:
         if not command:
             return
 
-        self.append_output(f"[{datetime.now().strftime('%H:%M:%S')}] 发送命令: {command}\n")
+        # 添加到命令历史
+        if command not in self.command_history:
+            self.command_history.append(command)
+            # 限制历史记录数量
+            if len(self.command_history) > 50:
+                self.command_history.pop(0)
+        self.history_index = -1
+
+        # 在实时模式下显示发送的命令
+        if self.live_mode_var.get():
+            self.append_output_with_style(f"{command}\n", "command")
 
         if self.serial_manager.send_command(command):
             self.manual_cmd_var.set("")
         else:
-            self.append_output("错误: 命令发送失败\n")
+            self.append_output_with_style("错误: 命令发送失败\n", "error")
+
+    def command_history_up(self, event):
+        """向上浏览命令历史"""
+        if not self.command_history:
+            return
+
+        if self.history_index == -1:
+            self.history_index = len(self.command_history) - 1
+        elif self.history_index > 0:
+            self.history_index -= 1
+
+        if 0 <= self.history_index < len(self.command_history):
+            self.manual_cmd_var.set(self.command_history[self.history_index])
+
+    def command_history_down(self, event):
+        """向下浏览命令历史"""
+        if not self.command_history:
+            return
+
+        if self.history_index < len(self.command_history) - 1:
+            self.history_index += 1
+            self.manual_cmd_var.set(self.command_history[self.history_index])
+        else:
+            self.history_index = -1
+            self.manual_cmd_var.set("")
 
     def on_serial_data_received(self, data):
         """串口数据接收回调"""
@@ -442,8 +570,20 @@ class NetworkDeviceAssistant:
 
     def append_output(self, text):
         """添加输出文本"""
+        self.append_output_with_style(text)
+
+    def append_output_with_style(self, text, style=None):
+        """添加带样式的输出文本"""
         self.output_text.config(state=tk.NORMAL)
-        self.output_text.insert(tk.END, text)
+
+        if style:
+            # 插入带样式的文本
+            start_pos = self.output_text.index(tk.END)
+            self.output_text.insert(tk.END, text)
+            end_pos = self.output_text.index(tk.END)
+            self.output_text.tag_add(style, start_pos, end_pos)
+        else:
+            self.output_text.insert(tk.END, text)
 
         # 自动滚动
         if self.auto_scroll_var.get():
@@ -517,6 +657,67 @@ class NetworkDeviceAssistant:
     def update_status(self, message):
         """更新状态栏"""
         self.status_label.config(text=message)
+
+    def on_auto_login_toggle(self):
+        """自动登录开关切换"""
+        enabled = self.auto_login_enabled_var.get()
+        if enabled:
+            self.save_login_config()
+
+    def save_login_config(self):
+        """保存登录配置"""
+        username = self.username_var.get().strip()
+        password = self.password_var.get().strip()
+        enable_password = self.enable_password_var.get().strip()
+        enabled = self.auto_login_enabled_var.get()
+
+        if enabled and not username:
+            messagebox.showwarning("警告", "启用自动登录时用户名不能为空")
+            self.auto_login_enabled_var.set(False)
+            return
+
+        self.auto_login_manager.update_login_config(
+            username=username,
+            password=password,
+            enable_password=enable_password,
+            enabled=enabled
+        )
+
+        self.update_status("登录配置已保存")
+        messagebox.showinfo("成功", "登录配置已保存")
+
+    def test_auto_login(self):
+        """测试自动登录"""
+        if not self.serial_manager.is_connected:
+            messagebox.showwarning("警告", "请先连接设备")
+            return
+
+        # 保存当前配置
+        self.save_login_config()
+
+        # 开始登录测试
+        self.start_auto_login()
+
+    def start_auto_login(self):
+        """开始自动登录"""
+        if self.auto_login_manager.start_auto_login():
+            self.update_login_status("正在登录...")
+        else:
+            self.update_login_status("登录启动失败")
+
+    def update_login_status(self, status):
+        """更新登录状态"""
+        self.login_status_label.config(text=status)
+
+        # 根据状态设置颜色
+        if "成功" in status:
+            self.login_status_label.config(foreground="green")
+        elif "失败" in status or "错误" in status or "超时" in status:
+            self.login_status_label.config(foreground="red")
+        elif "登录" in status:
+            self.login_status_label.config(foreground="orange")
+        else:
+            self.login_status_label.config(foreground="gray")
 
     def run(self):
         """运行应用程序"""
