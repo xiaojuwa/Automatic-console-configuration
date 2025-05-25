@@ -52,6 +52,10 @@ class NetworkDeviceAssistant:
         self.current_log_file = None
         self.is_auto_scroll = True
 
+        # 初始化 Tkinter 变量
+        self.auto_scroll_var = tk.BooleanVar(value=True)
+        self.live_mode_var = tk.BooleanVar(value=True)
+
         # 创建GUI
         self.create_gui()
 
@@ -260,6 +264,10 @@ class NetworkDeviceAssistant:
         self.local_echo_var = tk.BooleanVar(value=self.config.get("terminal", {}).get("local_echo", False))
         ttk.Checkbutton(options_frame, text="本地回显", variable=self.local_echo_var,
                        command=self.on_echo_change).pack(side=tk.LEFT)
+
+        ttk.Checkbutton(options_frame, text="自动滚动", variable=self.auto_scroll_var).pack(side=tk.LEFT, padx=(10, 0))
+
+        ttk.Checkbutton(options_frame, text="实时模式", variable=self.live_mode_var).pack(side=tk.LEFT, padx=(10, 0))
 
         # 终端操作按钮
         button_frame = ttk.Frame(control_frame)
