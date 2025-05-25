@@ -44,6 +44,17 @@ class Config:
                 "responses": {
                     "more": " "
                 }
+            },
+            "terminal": {
+                "local_echo": False,
+                "line_ending": "\r\n",
+                "font_family": "Consolas",
+                "font_size": 10,
+                "bg_color": "black",
+                "fg_color": "green",
+                "cursor_color": "green",
+                "buffer_size": 10000,
+                "auto_scroll": True
             }
         }
         self.config = self.load_config()

@@ -14,13 +14,14 @@ from serial_manager import SerialManager
 from device_detector import DeviceDetector
 from command_manager import CommandManager
 from auto_login_manager import AutoLoginManager
+from interactive_terminal import InteractiveTerminal
 
 class NetworkDeviceAssistant:
     """网络设备自动化助手主类"""
 
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("网络设备自动化助手 v1.1")
+        self.root.title("网络设备自动化助手 v1.2")
         self.root.geometry("1200x800")
 
         # 初始化配置和管理器
@@ -31,6 +32,9 @@ class NetworkDeviceAssistant:
         self.device_detector = DeviceDetector(self.config, self.serial_manager)
         self.command_manager = CommandManager(self.config, self.serial_manager)
         self.auto_login_manager = AutoLoginManager(self.config, self.serial_manager)
+
+        # 交互式终端（稍后初始化）
+        self.interactive_terminal = None
 
         # 创建默认命令序列
         self.command_manager.create_default_sequences()
@@ -222,56 +226,67 @@ class NetworkDeviceAssistant:
         ttk.Button(btn_frame, text="测试登录", command=self.test_auto_login, width=10).pack(side=tk.LEFT, padx=(5, 0))
 
     def create_output_panel(self, parent):
-        """创建右侧输出面板"""
-        output_frame = ttk.LabelFrame(parent, text="实时终端", padding=10)
+        """创建右侧交互式终端面板"""
+        output_frame = ttk.LabelFrame(parent, text="交互式终端 (SecureCRT风格)", padding=10)
         output_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-        # 创建带滚动条的文本框
-        self.output_text = scrolledtext.ScrolledText(
-            output_frame,
-            wrap=tk.CHAR,  # 改为字符换行，更像终端
-            font=('Consolas', 9),
-            state=tk.DISABLED,
-            bg='black',     # 黑色背景
-            fg='green',     # 绿色文字
-            insertbackground='green'  # 绿色光标
-        )
-        self.output_text.pack(fill=tk.BOTH, expand=True)
+        # 创建交互式终端
+        self.interactive_terminal = InteractiveTerminal(output_frame, self.config, self.serial_manager)
+        terminal_widget = self.interactive_terminal.get_widget()
+        terminal_widget.pack(fill=tk.BOTH, expand=True)
 
-        # 配置文本标签样式
-        self.output_text.tag_configure("timestamp", foreground="cyan")
-        self.output_text.tag_configure("command", foreground="yellow")
-        self.output_text.tag_configure("error", foreground="red")
-        self.output_text.tag_configure("success", foreground="lightgreen")
+        # 设置日志回调
+        self.interactive_terminal.set_log_callback(self.log_terminal_data)
 
-        # 输出控制
-        output_control_frame = ttk.Frame(output_frame)
-        output_control_frame.pack(fill=tk.X, pady=(10, 0))
+        # 终端控制面板
+        control_frame = ttk.Frame(output_frame)
+        control_frame.pack(fill=tk.X, pady=(10, 0))
 
-        self.auto_scroll_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(output_control_frame, text="自动滚动", variable=self.auto_scroll_var).pack(side=tk.LEFT)
+        # 终端模式切换
+        self.terminal_mode_var = tk.StringVar(value="interactive")
+        ttk.Label(control_frame, text="模式:").pack(side=tk.LEFT)
+        mode_frame = ttk.Frame(control_frame)
+        mode_frame.pack(side=tk.LEFT, padx=(5, 0))
 
-        # 实时模式开关
-        self.live_mode_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(output_control_frame, text="实时模式", variable=self.live_mode_var).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Radiobutton(mode_frame, text="交互式", variable=self.terminal_mode_var,
+                       value="interactive", command=self.on_mode_change).pack(side=tk.LEFT)
+        ttk.Radiobutton(mode_frame, text="传统", variable=self.terminal_mode_var,
+                       value="traditional", command=self.on_mode_change).pack(side=tk.LEFT, padx=(10, 0))
 
-        # 手动命令输入
-        manual_frame = ttk.Frame(output_control_frame)
-        manual_frame.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(10, 0))
+        # 终端选项
+        options_frame = ttk.Frame(control_frame)
+        options_frame.pack(side=tk.LEFT, padx=(20, 0))
 
-        ttk.Label(manual_frame, text="命令:").pack(side=tk.LEFT)
+        self.local_echo_var = tk.BooleanVar(value=self.config.get("terminal", {}).get("local_echo", False))
+        ttk.Checkbutton(options_frame, text="本地回显", variable=self.local_echo_var,
+                       command=self.on_echo_change).pack(side=tk.LEFT)
+
+        # 终端操作按钮
+        button_frame = ttk.Frame(control_frame)
+        button_frame.pack(side=tk.RIGHT)
+
+        ttk.Button(button_frame, text="清空终端", command=self.clear_terminal).pack(side=tk.LEFT)
+        ttk.Button(button_frame, text="保存日志", command=self.save_log).pack(side=tk.LEFT, padx=(5, 0))
+
+        # 传统模式的命令输入（初始隐藏）
+        self.traditional_frame = ttk.Frame(output_frame)
+
+        ttk.Label(self.traditional_frame, text="命令:").pack(side=tk.LEFT)
         self.manual_cmd_var = tk.StringVar()
-        manual_entry = ttk.Entry(manual_frame, textvariable=self.manual_cmd_var, font=('Consolas', 9))
-        manual_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
-        manual_entry.bind('<Return>', self.send_manual_command)
-        manual_entry.bind('<Up>', self.command_history_up)
-        manual_entry.bind('<Down>', self.command_history_down)
+        self.manual_entry = ttk.Entry(self.traditional_frame, textvariable=self.manual_cmd_var, font=('Consolas', 9))
+        self.manual_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
+        self.manual_entry.bind('<Return>', self.send_manual_command)
+        self.manual_entry.bind('<Up>', self.command_history_up)
+        self.manual_entry.bind('<Down>', self.command_history_down)
 
-        ttk.Button(manual_frame, text="发送", command=self.send_manual_command).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(self.traditional_frame, text="发送", command=self.send_manual_command).pack(side=tk.RIGHT, padx=(5, 0))
 
         # 命令历史
         self.command_history = []
         self.history_index = -1
+
+        # 保持对旧输出文本控件的引用（用于兼容性）
+        self.output_text = self.interactive_terminal.text_widget
 
     def create_status_bar(self):
         """创建状态栏"""
@@ -373,6 +388,9 @@ class NetworkDeviceAssistant:
             # 如果启用了自动登录，开始登录过程
             if self.auto_login_enabled_var.get():
                 self.start_auto_login()
+            else:
+                # 直接激活交互式终端
+                self.activate_interactive_terminal()
         else:
             messagebox.showerror("错误", "连接失败，请检查端口和波特率")
             self.update_status("连接失败")
@@ -566,7 +584,12 @@ class NetworkDeviceAssistant:
 
     def on_serial_data_received(self, data):
         """串口数据接收回调"""
-        self.root.after(0, self.append_output, data)
+        if self.interactive_terminal and self.terminal_mode_var.get() == "interactive":
+            # 交互式模式：直接发送到终端
+            self.interactive_terminal.receive_data(data)
+        else:
+            # 传统模式：使用原有方式
+            self.root.after(0, self.append_output, data)
 
     def append_output(self, text):
         """添加输出文本"""
@@ -698,12 +721,7 @@ class NetworkDeviceAssistant:
         # 开始登录测试
         self.start_auto_login()
 
-    def start_auto_login(self):
-        """开始自动登录"""
-        if self.auto_login_manager.start_auto_login():
-            self.update_login_status("正在登录...")
-        else:
-            self.update_login_status("登录启动失败")
+
 
     def update_login_status(self, status):
         """更新登录状态"""
@@ -718,6 +736,66 @@ class NetworkDeviceAssistant:
             self.login_status_label.config(foreground="orange")
         else:
             self.login_status_label.config(foreground="gray")
+
+    def on_mode_change(self):
+        """终端模式切换"""
+        mode = self.terminal_mode_var.get()
+
+        if mode == "interactive":
+            # 切换到交互式模式
+            self.traditional_frame.pack_forget()
+            if self.interactive_terminal:
+                self.activate_interactive_terminal()
+        else:
+            # 切换到传统模式
+            self.traditional_frame.pack(fill=tk.X, pady=(10, 0))
+            if self.interactive_terminal:
+                self.interactive_terminal.deactivate()
+
+    def on_echo_change(self):
+        """本地回显设置变更"""
+        if self.interactive_terminal:
+            self.interactive_terminal.configure_terminal(local_echo=self.local_echo_var.get())
+
+    def activate_interactive_terminal(self):
+        """激活交互式终端"""
+        if self.interactive_terminal and self.terminal_mode_var.get() == "interactive":
+            self.interactive_terminal.activate()
+
+    def clear_terminal(self):
+        """清空终端"""
+        if self.interactive_terminal:
+            self.interactive_terminal.clear()
+        else:
+            self.clear_output()
+
+    def log_terminal_data(self, data):
+        """记录终端数据到日志"""
+        if self.current_log_file:
+            try:
+                with open(self.current_log_file, 'a', encoding='utf-8') as f:
+                    f.write(data)
+            except Exception as e:
+                print(f"写入日志文件失败: {e}")
+
+    def start_auto_login(self):
+        """开始自动登录"""
+        if self.auto_login_manager.start_auto_login():
+            self.update_login_status("正在登录...")
+            # 登录成功后激活终端
+            self.root.after(1000, self.check_login_status)
+        else:
+            self.update_login_status("登录启动失败")
+
+    def check_login_status(self):
+        """检查登录状态"""
+        status = self.auto_login_manager.get_status()
+
+        if status["login_success"]:
+            self.activate_interactive_terminal()
+        elif not status["is_logging_in"]:
+            # 登录失败或超时，仍然激活终端
+            self.activate_interactive_terminal()
 
     def run(self):
         """运行应用程序"""

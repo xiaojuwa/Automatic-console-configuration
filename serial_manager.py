@@ -158,6 +158,19 @@ class SerialManager:
             print(f"发送命令失败: {e}")
             return False
 
+    def send_raw_data(self, data: bytes) -> bool:
+        """发送原始数据（用于交互式终端）"""
+        if not self.is_connected or not self.serial_connection:
+            return False
+
+        try:
+            self.serial_connection.write(data)
+            return True
+
+        except Exception as e:
+            print(f"发送原始数据失败: {e}")
+            return False
+
     def _read_data(self):
         """读取数据的线程函数"""
         buffer = ""
